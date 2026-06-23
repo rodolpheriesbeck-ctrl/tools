@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulateur Patrimoine</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#f5f4f2;--surf:#fff;--border:#e5e3e0;--border2:#d0cdc9;--t1:#1c1917;--t2:#78716c;--t3:#a8a29e;--green:#3B6D11;--red:#A32D2D;--blue:#185FA5;--rmd:6px;--rlg:10px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#161412;--surf:#1c1917;--border:#2c2825;--border2:#3d3835;--t1:#fafaf9;--t2:#a8a29e;--t3:#57534e;--green:#86efac;--red:#fca5a5}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidden}
+#root{display:flex;flex-direction:column;height:100vh}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:44px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-title{font-size:14px;font-weight:600}
+.saved-badge{font-size:11px;color:var(--t3);display:flex;align-items:center;gap:3px}
+
+/* tab bar */
+.tabbar{display:flex;align-items:stretch;padding:0 14px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;gap:2px}
+.tabbar::-webkit-scrollbar{height:3px}.tabbar::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.tab{display:flex;align-items:center;gap:7px;padding:0 12px;height:38px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;font-size:13px;color:var(--t2);flex-shrink:0;transition:color .12s}
+.tab.active{border-bottom-color:var(--blue);color:var(--t1)}
+.tab:hover:not(.active){color:var(--t1)}
+.tab-name-input{border:none;background:transparent;font-size:13px;font-family:inherit;color:var(--t1);width:90px;outline:none;border-bottom:1px solid var(--blue);padding:0}
+.tab-perf{font-size:11px;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(59,109,17,.12);color:var(--green)}
+.tab-perf.neg{background:rgba(163,45,45,.12);color:var(--red)}
+.tab-del{font-size:13px;color:var(--t3);cursor:pointer;line-height:1;padding:2px;border:none;background:none}
+.tab-del:hover{color:var(--red)}
+.tab-edit{font-size:11px;color:var(--t3);cursor:pointer;padding:2px 3px;border:none;background:none;opacity:0;transition:opacity .15s}
+.tab.active .tab-edit{opacity:1}
+.tab-edit:hover{color:var(--blue)}
+.tab-add{display:flex;align-items:center;padding:0 10px;font-size:18px;color:var(--t3);cursor:pointer;border:none;background:none;height:38px}
+.tab-add:hover{color:var(--blue)}
+
+/* columns */
+.columns{display:flex;flex:1;min-height:0}
+.left{width:290px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);background:var(--surf);padding:14px}
+.left::-webkit-scrollbar{width:4px}.left::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.right{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.right::-webkit-scrollbar{width:4px}.right::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* left panel helpers */
+.sec-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:6px;margin-top:14px}
+.sec-label:first-child{margin-top:0}
+.field-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.field-row label{font-size:12px;color:var(--t2)}
+.field-row .fr{display:flex;align-items:center;gap:4px}
+.field-row input{width:100px;font-size:12px;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--rmd);background:var(--bg);color:var(--t1);text-align:right}
+.unit{font-size:11px;color:var(--t2);min-width:28px}
+
+/* product chips */
+.prod-list{display:flex;flex-direction:column;gap:5px}
+.prod-chip{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--rmd);cursor:pointer;transition:border-color .12s;background:var(--bg)}
+.prod-chip.sel{border:2px solid var(--blue);background:var(--surf)}
+.prod-chip:hover:not(.sel){border-color:var(--border2)}
+.prod-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.prod-chip-name{font-size:12px;font-weight:500;flex:1}
+.alloc-inp{width:68px;font-size:12px;padding:3px 5px;border:1px solid var(--border2);border-radius:var(--rmd);background:var(--surf);color:var(--t1);text-align:right}
+
+/* budget bar */
+.bbar{background:var(--bg);border:1px solid var(--border);border-radius:var(--rmd);padding:9px 11px;margin-top:8px}
+.bbar-row{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap}
+.bbar .lbl{color:var(--t2)}.bbar .val{font-weight:600}
+.bbar .val.ok{color:var(--green)}.bbar .val.warn{color:var(--red)}
+.bbar-prog{width:100%;height:3px;background:var(--border);border-radius:2px;margin-top:7px;overflow:hidden}
+.bbar-fill{height:100%;border-radius:2px;transition:width .2s}
+
+/* param section */
+.psec{background:var(--bg);border:1px solid var(--border);border-radius:var(--rlg);padding:10px 11px;margin-bottom:7px}
+.psec:last-child{margin-bottom:0}
+.psec-head{display:flex;align-items:center;gap:5px;margin-bottom:8px;font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
+.prow{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.prow:last-child{margin-bottom:0}
+.prow label{flex:1;font-size:12px;color:var(--t1)}
+.prow input{width:80px;font-size:12px;padding:3px 5px;border:1px solid var(--border2);border-radius:var(--rmd);background:var(--surf);color:var(--t1);text-align:right}
+
+/* ETF specific */
+.etf-toggle{display:flex;gap:5px;margin-bottom:8px}
+.toggle-btn{flex:1;padding:4px;font-size:11px;border:1px solid var(--border2);border-radius:var(--rmd);cursor:pointer;background:none;color:var(--t2);text-align:center}
+.toggle-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.etf-table{width:100%;font-size:11px;border-collapse:collapse;margin-bottom:6px}
+.etf-table th{color:var(--t3);font-weight:500;padding:3px 4px;text-align:left;border-bottom:1px solid var(--border)}
+.etf-table td{padding:3px 4px;border-bottom:1px solid var(--border)}
+.etf-table tr:last-child td{border-bottom:none}
+.etf-pct-inp{width:40px;font-size:11px;padding:2px 4px;border:1px solid var(--border2);border-radius:3px;background:var(--surf);color:var(--t1);text-align:right}
+.etf-blend{font-size:11px;color:var(--t2);padding:5px 6px;background:var(--surf);border-radius:var(--rmd);display:flex;gap:10px;flex-wrap:wrap}
+.etf-blend span{color:var(--t1);font-weight:600}
+.etf-pct-warn{font-size:10px;color:var(--red)}
+
+/* right panel */
+.rblock{background:var(--surf);border:1px solid var(--border);border-radius:var(--rlg);padding:14px}
+.rhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px}
+.rhead-title{font-size:13px;font-weight:600}
+.horizon-row{display:flex;gap:4px}
+.hbtn{padding:3px 9px;font-size:12px;border:1px solid var(--border2);border-radius:var(--rmd);cursor:pointer;background:none;color:var(--t2)}
+.hbtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.kpi-row{display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap}
+.kpi{flex:1;min-width:80px;background:var(--bg);border-radius:var(--rmd);padding:9px 10px}
+.kpi-label{font-size:10px;color:var(--t2);margin-bottom:3px}
+.kpi-val{font-size:15px;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:9px}
+.legend span{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2)}
+.ldot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.chart-wrap{position:relative;width:100%;height:190px}
+
+/* cashflow breakdown */
+.cf-breakdown{display:flex;flex-direction:column;gap:7px;margin-top:11px}
+.cf-prod{background:var(--bg);border-radius:var(--rmd);padding:9px 11px}
+.cf-prod-name{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.cf-equation{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cf-chip{padding:3px 8px;border-radius:3px;font-size:12px;font-weight:500}
+.cf-chip.rev{background:rgba(59,109,17,.12);color:var(--green)}
+.cf-chip.cst{background:rgba(163,45,45,.12);color:var(--red)}
+.cf-chip.net-pos{background:rgba(24,95,165,.12);color:var(--blue)}
+.cf-chip.net-neg{background:rgba(163,45,45,.18);color:var(--red)}
+.cf-op{font-size:14px;color:var(--t3);font-weight:300}
+.cf-total-row{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--bg);border-radius:var(--rmd);margin-top:2px;font-size:13px;font-weight:600}
+
+/* buttons */
+.btn-ghost{padding:5px 10px;font-size:12px;background:none;border:1px solid var(--border2);border-radius:var(--rmd);cursor:pointer;color:var(--t2)}
+.btn-ghost:hover{background:var(--bg);color:var(--t1)}
+
+@media(max-width:520px){
+  body{overflow:auto}.columns{flex-direction:column}
+  .left{width:100%;border-right:none;border-bottom:1px solid var(--border);overflow-y:visible}
+  .right{overflow-y:visible}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const COLORS = { etf:'#185FA5', immo:'#0F6E56', av:'#534AB7', scpi:'#BA7517', fonds:'#888780', livretA:'#E85D04' };
+const DASH   = { etf:[], immo:[6,3], av:[2,2], scpi:[8,4], fonds:[4,4], livretA:[3,3] };
+
+const ETF_PRESETS = [
+  { id:'world',     name:'MSCI World',      ticker:'IWDA', rendement:8.0,  frais:0.20 },
+  { id:'sp500',     name:'S&P 500',          ticker:'SXR8', rendement:9.0,  frais:0.07 },
+  { id:'nasdaq',    name:'NASDAQ 100',       ticker:'CNDX', rendement:12.0, frais:0.22 },
+  { id:'em',        name:'Émergents',        ticker:'IEMA', rendement:5.0,  frais:0.18 },
+  { id:'eurostoxx', name:'Euro Stoxx 600',   ticker:'MEUD', rendement:6.0,  frais:0.07 },
+  { id:'smallcap',  name:'Small Cap World',  ticker:'IUSN', rendement:7.0,  frais:0.35 },
+  { id:'usa',       name:'MSCI USA',         ticker:'CSPX', rendement:9.0,  frais:0.15 },
+  { id:'gold',      name:'Or (ETC)',         ticker:'SGLN', rendement:4.0,  frais:0.15 },
+];
+
+const PRODUCTS_META = {
+  etf: { id:'etf', name:'ETF / PEA', icon:'ti-chart-bar', color:COLORS.etf,
+    defaults:{ alloc:45000, etfType:'acc', fiscalite:17.2, dividendYield:2.0,
+               portfolio: ETF_PRESETS.map((e,i)=>({presetId:e.id,pct:i===0?60:i===1?40:0})) },
+    params:[] },
+  immo: { id:'immo', name:'Immo locatif', icon:'ti-home', color:COLORS.immo,
+    defaults:{ alloc:15000, prixBien:135000, loyer:900, tauxOccupation:60, fraisGestion:20,
+               charges:72, taxeFonciere:1200, creditTaux:3.5, creditDuree:20, apport:15000, revalo:1 },
+    params:[
+      { key:'prixBien',       label:'Prix du bien',    unit:'€',      min:50000, max:500000, step:1000 },
+      { key:'apport',         label:'Apport',          unit:'€',      min:5000,  max:100000, step:1000 },
+      { key:'loyer',          label:'Loyer/sem (HS)',  unit:'€',      min:100,   max:2000,   step:50   },
+      { key:'tauxOccupation', label:"Taux occupation", unit:'%',      min:20,    max:95,     step:5    },
+      { key:'fraisGestion',   label:'Frais gestion',   unit:'%',      min:0,     max:35,     step:1    },
+      { key:'charges',        label:'Charges copro',   unit:'€/mois', min:0,     max:500,    step:10   },
+      { key:'taxeFonciere',   label:'Taxe foncière',   unit:'€/an',   min:0,     max:3000,   step:100  },
+      { key:'creditTaux',     label:'Taux crédit',     unit:'%',      min:1,     max:6,      step:0.1  },
+      { key:'creditDuree',    label:'Durée crédit',    unit:'ans',    min:10,    max:25,     step:1    },
+      { key:'revalo',         label:'Revalorisation',  unit:'%/an',   min:0,     max:5,      step:0.5  },
+    ]},
+  av:   { id:'av',   name:'Assurance-vie', icon:'ti-shield', color:COLORS.av,
+    defaults:{ alloc:10000, rendement:4.5, fraisEnvelope:0.6, fraisFonds:0.8, fiscaliteAv8:7.5 },
+    params:[
+      { key:'rendement',    label:'Rendement UC',       unit:'%', min:1, max:12,  step:0.5 },
+      { key:'fraisEnvelope',label:"Frais enveloppe",    unit:'%', min:0, max:1.5, step:0.1 },
+      { key:'fraisFonds',   label:'Frais fonds UC',     unit:'%', min:0, max:2,   step:0.1 },
+      { key:'fiscaliteAv8', label:'Fiscalité > 8 ans',  unit:'%', min:0, max:30,  step:0.5 },
+    ]},
+  scpi: { id:'scpi', name:'SCPI', icon:'ti-building', color:COLORS.scpi,
+    defaults:{ alloc:10000, rendement:4.5, fraisEntree:8, fraisGestion:12, retenueSource:12.8, revalo:0.5 },
+    params:[
+      { key:'rendement',     label:'Taux distribution', unit:'%',    min:2,  max:8,  step:0.25 },
+      { key:'fraisEntree',   label:"Frais d'entrée",    unit:'%',    min:0,  max:12, step:0.5  },
+      { key:'fraisGestion',  label:'Frais gestion SC',  unit:'%',    min:5,  max:20, step:1    },
+      { key:'retenueSource', label:'Fiscalité (IR+PS)', unit:'%',    min:0,  max:50, step:1    },
+      { key:'revalo',        label:'Revalorisation',    unit:'%/an', min:-2, max:4,  step:0.25 },
+    ]},
+  fonds:{ id:'fonds', name:'Fonds euros', icon:'ti-lock', color:COLORS.fonds,
+    defaults:{ alloc:0, rendement:2.5, fraisEnvelope:0.6, fiscalite:17.2 },
+    params:[
+      { key:'rendement',    label:'Rendement annuel', unit:'%', min:1, max:5,   step:0.25 },
+      { key:'fraisEnvelope',label:"Frais enveloppe",  unit:'%', min:0, max:1.5, step:0.1  },
+      { key:'fiscalite',    label:'Fiscalité',         unit:'%', min:0, max:30,  step:0.5  },
+    ]},
+  livretA:{ id:'livretA', name:'Livret A', icon:'ti-pig-money', color:COLORS.livretA,
+    defaults:{ alloc:10000, rendement:3.0, mensuel:100, plafond:22950 },
+    params:[
+      { key:'rendement', label:'Taux d\'intérêt',   unit:'%', min:0.5, max:5,     step:0.25 },
+      { key:'mensuel',   label:'Versement mensuel', unit:'€', min:0,   max:500,   step:10   },
+      { key:'plafond',   label:'Plafond',           unit:'€', min:5000,max:22950, step:950  },
+    ]},
+};
+
+// ── Storage ────────────────────────────────────────────────────────────────
+const SK = 'sim_pat_v3';
+const loadRoot = () => { try { const r=localStorage.getItem(SK); if(r)return JSON.parse(r); } catch{} return null; };
+const saveRoot = s => { try { localStorage.setItem(SK,JSON.stringify(s)); } catch{} };
+
+// ── Formatters ─────────────────────────────────────────────────────────────
+const fmt    = n => Math.round(n).toLocaleString('fr-FR')+' €';
+const fmtK   = n => { const r=Math.round(n); return Math.abs(r)>=1000?(r/1000).toFixed(0)+'k€':r+'€'; };
+const fmtSign= n => { const r=Math.round(n); return (r>=0?'+':'')+r.toLocaleString('fr-FR')+' €'; };
+
+// ── Math ───────────────────────────────────────────────────────────────────
+function computeETFBlend(portfolio) {
+  const active = (portfolio||[]).filter(p => p.pct > 0);
+  const total  = active.reduce((s,p) => s+p.pct, 0);
+  if (total === 0) return { rendement:7, frais:0.2 };
+  return {
+    rendement: active.reduce((s,p) => { const e=ETF_PRESETS.find(e=>e.id===p.presetId); return s+(p.pct/total)*(e?.rendement||7); }, 0),
+    frais:     active.reduce((s,p) => { const e=ETF_PRESETS.find(e=>e.id===p.presetId); return s+(p.pct/total)*(e?.frais||0.2); }, 0),
+  };
+}
+
+function calcImmoMonthly(p) {
+  const montant = p.prixBien - p.apport;
+  const r = p.creditTaux/100/12, n = p.creditDuree*12;
+  const mensualite = r===0 ? montant/n : montant*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
+  const loyerBrut  = (p.loyer*52/12)*(p.tauxOccupation/100);
+  const fraisGestionMens = loyerBrut*p.fraisGestion/100;
+  const loyerNet   = loyerBrut - fraisGestionMens;
+  const charges    = p.charges + p.taxeFonciere/12;
+  return { mensualite, loyerBrut, fraisGestionMens, loyerNet, charges, cashflow: loyerNet - mensualite - charges };
+}
+
+function getSavingsRate(savingsTarget, params) {
+  if (savingsTarget==='etf')    { const b=computeETFBlend(params.etf?.portfolio); return (b.rendement-b.frais)/100; }
+  if (savingsTarget==='av')     return (params.av.rendement-params.av.fraisEnvelope-params.av.fraisFonds)/100;
+  if (savingsTarget==='fonds')  return (params.fonds.rendement-params.fonds.fraisEnvelope)/100;
+  if (savingsTarget==='livretA')return params.livretA.rendement/100;
+  return 0;
+}
+
+function projectSavingsOnly(savingsTarget, params, years, monthlySaving) {
+  const rate = getSavingsRate(savingsTarget, params);
+  let val=0; const vals=[0];
+  for(let y=1;y<=years;y++){ for(let m=0;m<12;m++) val=val*(1+rate/12)+monthlySaving; vals.push(val); }
+  return vals;
+}
+
+function projectProduct(id, p, years, monthlySaving, savingsTarget) {
+  const monthly = (SAVINGS_CAPABLE.includes(id) && id===savingsTarget) ? monthlySaving : 0;
+  if (id === 'etf') {
+    const blend = computeETFBlend(p.portfolio);
+    const taxDrag = p.etfType==='dist' ? (p.dividendYield||2)*(p.fiscalite||17.2)/100/100 : 0;
+    const net = (blend.rendement - blend.frais)/100 - taxDrag;
+    let val = p.alloc||0; const vals=[val];
+    for(let y=1;y<=years;y++){ for(let m=0;m<12;m++) val=val*(1+net/12)+monthly; vals.push(val); }
+    return vals;
+  }
+  if (id === 'immo') {
+    const montant = p.prixBien - p.apport;
+    const r = p.creditTaux/100/12, n = p.creditDuree*12;
+    const mens = r===0?montant/n:montant*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
+    let capitalDu=montant, bienVal=p.prixBien; const vals=[p.apport];
+    for(let y=1;y<=years;y++){
+      for(let m=0;m<12;m++){ if(capitalDu>0){const i=capitalDu*r;capitalDu=Math.max(0,capitalDu-(mens-i));} }
+      bienVal*=(1+p.revalo/100); vals.push(Math.max(0,bienVal-capitalDu));
+    }
+    return vals;
+  }
+  if (id === 'av') {
+    const net = (p.rendement - p.fraisEnvelope - p.fraisFonds)/100;
+    let val=p.alloc||0; const vals=[val];
+    for(let y=1;y<=years;y++){ for(let m=0;m<12;m++) val=val*(1+net/12)+monthly; vals.push(val); }
+    return vals;
+  }
+  if (id === 'scpi') {
+    const netAlloc=(p.alloc||0)*(1-p.fraisEntree/100);
+    let pv=netAlloc; const vals=[netAlloc];
+    for(let y=1;y<=years;y++){
+      const l=pv*p.rendement/100*(1-p.retenueSource/100);
+      pv=pv*(1+p.revalo/100)+l; vals.push(pv);
+    }
+    return vals;
+  }
+  if (id === 'fonds') {
+    const net=(p.rendement-p.fraisEnvelope)/100;
+    let val=p.alloc||0; const vals=[val];
+    for(let y=1;y<=years;y++){ for(let m=0;m<12;m++) val=val*(1+net/12)+monthly; vals.push(val); }
+    return vals;
+  }
+  if (id === 'livretA') {
+    const rate=p.rendement/100/12, cap=p.plafond||22950;
+    let val=p.alloc||0; const vals=[val];
+    for(let y=1;y<=years;y++){
+      for(let m=0;m<12;m++){ val=val*(1+rate); if(val<cap&&monthly>0) val=Math.min(val+monthly,cap); }
+      vals.push(val);
+    }
+    return vals;
+  }
+  return Array(years+1).fill(0);
+}
+
+function getCFData(id, p, monthlySaving) {
+  if (id==='etf') {
+    const blend = computeETFBlend(p.portfolio);
+    if (p.etfType==='dist') {
+      const divMens = Math.round((p.alloc||0)*((p.dividendYield||2)/100/12)*(1-(p.fiscalite||17.2)/100));
+      return { revenus:divMens, couts:monthlySaving, net:divMens-monthlySaving,
+               detail:{ items:[{l:'Dividendes nets',v:divMens},{l:'DCA mensuel',v:-monthlySaving}] } };
+    }
+    return { revenus:0, couts:monthlySaving, net:-monthlySaving,
+             detail:{ items:[{l:'DCA mensuel (Acc)',v:-monthlySaving},{l:'Plus-value capitalisée',v:0}] } };
+  }
+  if (id==='immo') {
+    const m = calcImmoMonthly(p);
+    return {
+      revenus: Math.round(m.loyerNet),
+      couts:   Math.round(m.mensualite+m.charges),
+      net:     Math.round(m.cashflow),
+      detail:{
+        revenus:[
+          {l:'Loyer brut',          v:Math.round(m.loyerBrut)},
+          {l:`Frais gestion (${p.fraisGestion}%)`, v:-Math.round(m.fraisGestionMens)},
+        ],
+        charges:[
+          {l:`Crédit (${p.creditDuree}a à ${p.creditTaux}%)`, v:-Math.round(m.mensualite)},
+          {l:'Charges copro',       v:-Math.round(p.charges)},
+          {l:'Taxe foncière',       v:-Math.round(p.taxeFonciere/12)},
+        ],
+      },
+    };
+  }
+  if (id==='av') {
+    const rev=Math.round((p.alloc||0)*(p.rendement-p.fraisEnvelope-p.fraisFonds)/100/12);
+    return { revenus:rev, couts:0, net:rev, detail:{ items:[{l:'Intérêts capitalisés',v:rev}] } };
+  }
+  if (id==='scpi') {
+    const l=Math.round((p.alloc||0)*(1-p.fraisEntree/100)*p.rendement/100/12);
+    const t=Math.round(l*p.retenueSource/100);
+    return { revenus:l, couts:t, net:l-t,
+             detail:{ items:[{l:'Distribution brute',v:l},{l:`Fiscalité ${p.retenueSource}%`,v:-t}] } };
+  }
+  if (id==='fonds') {
+    const rev=Math.round((p.alloc||0)*(p.rendement-p.fraisEnvelope)/100/12);
+    return { revenus:rev, couts:0, net:rev, detail:{ items:[{l:'Intérêts capitalisés',v:rev}] } };
+  }
+  if (id==='livretA') {
+    const rev=Math.round((p.alloc||0)*p.rendement/100/12);
+    return { revenus:rev, couts:0, net:rev, detail:{ items:[{l:'Intérêts (défiscalisés)',v:rev}] } };
+  }
+  return { revenus:0, couts:0, net:0, detail:{items:[]} };
+}
+
+function computeTabPerf(tabState) {
+  const { selected, params, monthlySaving, savingsTarget='etf' } = tabState;
+  const keys = Object.keys(PRODUCTS_META).filter(k=>selected[k]);
+  const total10 = keys.reduce((s,k)=>s+(projectProduct(k,params[k],10,monthlySaving,savingsTarget)[10]||0),0);
+  const init    = keys.reduce((s,k)=>s+(params[k].alloc||0),0);
+  if (!init) return 0;
+  return (total10/init-1)*100;
+}
+
+// ── Default state ──────────────────────────────────────────────────────────
+const SAVINGS_CAPABLE = ['etf','av','fonds','livretA'];
+
+const mkDefaults = () => ({
+  budget:80000, monthlySaving:600, savingsTarget:'etf',
+  selected:{ etf:true, immo:true, av:false, scpi:false, fonds:false, livretA:false },
+  params:Object.fromEntries(Object.entries(PRODUCTS_META).map(([k,v])=>[k,{...v.defaults}])),
+});
+
+function mergeState(saved) {
+  const def = mkDefaults();
+  if (!saved) return def;
+  return {
+    ...def, ...saved,
+    params: Object.fromEntries(Object.keys(PRODUCTS_META).map(k=>[k,{...def.params[k],...(saved.params?.[k]||{})}])),
+  };
+}
+
+const mkTab = (name, state) => ({ id: Date.now()+Math.random(), name, ...mergeState(state) });
+
+// ── ChartCanvas ────────────────────────────────────────────────────────────
+function ChartCanvas({ config }) {
+  const ref=useRef(null), chart=useRef(null);
+  useEffect(()=>{
+    if(!ref.current)return;
+    if(chart.current)chart.current.destroy();
+    chart.current=new Chart(ref.current,config);
+    return ()=>{ if(chart.current){chart.current.destroy();chart.current=null;} };
+  },[JSON.stringify(config)]);
+  return <canvas ref={ref} />;
+}
+
+// ── TabBar ─────────────────────────────────────────────────────────────────
+function TabBar({ tabs, activeId, onSwitch, onAdd, onRename, onDelete }) {
+  const [editing, setEditing] = useState(null);
+  const [editVal, setEditVal] = useState('');
+  const startEdit=(id,name,e)=>{ e.preventDefault(); e.stopPropagation(); setEditing(id); setEditVal(name); };
+  const commitEdit=(id)=>{ if(editVal.trim()) onRename(id,editVal.trim()); setEditing(null); };
+  return (
+    <div className="tabbar">
+      {tabs.map(tab=>{
+        const perf = computeTabPerf(tab);
+        const active = tab.id===activeId;
+        return (
+          <div key={tab.id} className={`tab ${active?'active':''}`} onClick={()=>onSwitch(tab.id)}>
+            {editing===tab.id
+              ? <input className="tab-name-input" autoFocus value={editVal}
+                  onChange={e=>setEditVal(e.target.value)}
+                  onBlur={()=>commitEdit(tab.id)}
+                  onKeyDown={e=>{ if(e.key==='Enter')commitEdit(tab.id); if(e.key==='Escape')setEditing(null); e.stopPropagation(); }}
+                  onClick={e=>e.stopPropagation()} />
+              : <span>{tab.name}</span>
+            }
+            {active && editing!==tab.id && (
+              <button className="tab-edit" title="Renommer" onClick={e=>startEdit(tab.id,tab.name,e)}>
+                <i className="ti ti-pencil" />
+              </button>
+            )}
+            <span className={`tab-perf ${perf<0?'neg':''}`}>{perf>=0?'+':''}{perf.toFixed(0)}%</span>
+            {tabs.length>1 && <button className="tab-del" onClick={e=>{e.stopPropagation();onDelete(tab.id);}} title="Supprimer">×</button>}
+          </div>
+        );
+      })}
+      <button className="tab-add" onClick={onAdd} title="Nouveau scénario">+</button>
+    </div>
+  );
+}
+
+// ── ETFPortfolio ────────────────────────────────────────────────────────────
+function ETFPortfolio({ p, onChange }) {
+  const total = (p.portfolio||[]).reduce((s,e)=>s+e.pct,0);
+  const blend = computeETFBlend(p.portfolio);
+  const setPct=(presetId,val)=>{
+    const port=(p.portfolio||[]).map(e=>e.presetId===presetId?{...e,pct:parseInt(val)||0}:e);
+    onChange('portfolio',port);
+  };
+  return (
+    <div>
+      <div className="etf-toggle">
+        <button className={`toggle-btn ${p.etfType==='acc'?'active':''}`} onClick={()=>onChange('etfType','acc')}>
+          ● Acc (capitalisant)
+        </button>
+        <button className={`toggle-btn ${p.etfType==='dist'?'active':''}`} onClick={()=>onChange('etfType','dist')}>
+          ◎ Dist (distribuant)
+        </button>
+      </div>
+      <table className="etf-table">
+        <thead><tr><th>ETF</th><th>%</th><th>Rend.</th><th>TER</th></tr></thead>
+        <tbody>
+          {ETF_PRESETS.map(preset=>{
+            const entry = (p.portfolio||[]).find(e=>e.presetId===preset.id)||{pct:0};
+            return (
+              <tr key={preset.id} style={{opacity:entry.pct>0?1:0.5}}>
+                <td title={preset.ticker}>{preset.name}</td>
+                <td><input className="etf-pct-inp" type="number" value={entry.pct} min="0" max="100"
+                  onChange={e=>setPct(preset.id,e.target.value)} /></td>
+                <td style={{color:'var(--green)',fontWeight:500}}>{preset.rendement}%</td>
+                <td style={{color:'var(--t3)'}}>{preset.frais}%</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {total!==100 && <div className="etf-pct-warn">⚠ Total = {total}% (doit être 100%)</div>}
+      <div className="etf-blend">
+        <span>Blend: <span>{blend.rendement.toFixed(2)}%/an</span></span>
+        <span>TER: <span>{blend.frais.toFixed(2)}%</span></span>
+      </div>
+      <div className="prow" style={{marginTop:7}}>
+        <label>Fiscalité sortie</label>
+        <input type="number" value={p.fiscalite} min="0" max="30" step="0.1" onChange={e=>onChange('fiscalite',parseFloat(e.target.value)||0)} />
+        <span className="unit">%</span>
+      </div>
+      {p.etfType==='dist' && (
+        <div className="prow">
+          <label>Rendement dividendes</label>
+          <input type="number" value={p.dividendYield||2} min="0" max="8" step="0.5" onChange={e=>onChange('dividendYield',parseFloat(e.target.value)||0)} />
+          <span className="unit">%</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Config ─────────────────────────────────────────────────────────────────
+function Config({ state, update }) {
+  const { budget, monthlySaving, savingsTarget='etf', selected, params } = state;
+  const totalAlloc = Object.keys(PRODUCTS_META).reduce((s,k)=>s+(selected[k]?params[k].alloc||0:0),0);
+  const rem = budget-totalAlloc, fillPct=Math.min(100,budget>0?(totalAlloc/budget)*100:0);
+  const handleToggle = id => update({ selected:{...selected,[id]:!selected[id]} });
+  const handleAlloc = (id,v) => {
+    const val=parseInt(v)||0;
+    const p={...params[id],alloc:val};
+    if(id==='immo') p.apport=val;
+    update({ params:{...params,[id]:p} });
+  };
+  const handleParam = (id,k,v) => {
+    const val=parseFloat(v)||0;
+    const p={...params[id],[k]:val};
+    if(id==='immo'&&k==='apport') p.alloc=val;
+    update({ params:{...params,[id]:p} });
+  };
+  const handleETFProp= (k,v) => update({ params:{...params,etf:{...params.etf,[k]:v}} });
+  return (
+    <>
+      <div className="sec-label">Capital &amp; épargne</div>
+      <div className="field-row"><label>Capital initial</label>
+        <div className="fr"><input type="number" value={budget} step="1000" onChange={e=>update({budget:parseInt(e.target.value)||0})} /><span className="unit">€</span></div></div>
+      <div className="field-row"><label>Épargne mensuelle</label>
+        <div className="fr"><input type="number" value={monthlySaving} step="50" onChange={e=>update({monthlySaving:parseInt(e.target.value)||0})} /><span className="unit">€/mois</span></div></div>
+      {(() => {
+        const targets=Object.keys(PRODUCTS_META).filter(k=>SAVINGS_CAPABLE.includes(k)&&selected[k]);
+        if(!targets.length)return null;
+        const validTarget=targets.includes(savingsTarget)?savingsTarget:targets[0];
+        if(validTarget!==savingsTarget)update({savingsTarget:validTarget});
+        return (
+          <div className="field-row"><label>Investir dans</label>
+            <select value={validTarget} onChange={e=>update({savingsTarget:e.target.value})}
+              style={{fontSize:12,padding:'4px 6px',border:'1px solid var(--border2)',borderRadius:'var(--rmd)',background:'var(--bg)',color:'var(--t1)'}}>
+              {targets.map(k=><option key={k} value={k}>{PRODUCTS_META[k].name}</option>)}
+            </select>
+          </div>
+        );
+      })()}
+
+      <div className="sec-label">Produits</div>
+      <div className="prod-list">
+        {Object.values(PRODUCTS_META).map(meta=>(
+          <div key={meta.id} className={`prod-chip ${selected[meta.id]?'sel':''}`} onClick={()=>handleToggle(meta.id)}>
+            <span className="prod-dot" style={{background:selected[meta.id]?meta.color:'var(--border2)'}} />
+            <span className="prod-chip-name" style={{color:selected[meta.id]?meta.color:'var(--t1)'}}>
+              <i className={`ti ${meta.icon}`} style={{marginRight:4}} />{meta.name}
+            </span>
+            <div onClick={e=>e.stopPropagation()}>
+              <input className="alloc-inp" type="number" value={params[meta.id].alloc||0} step="1000"
+                onChange={e=>handleAlloc(meta.id,e.target.value)} />
+            </div>
+            <span className="unit">€</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="bbar">
+        <div className="bbar-row">
+          <span className="lbl">Alloué</span><span className="val">{fmt(totalAlloc)}</span>
+          <span className="lbl">sur {fmt(budget)}</span>
+          <span className="lbl" style={{marginLeft:'auto'}}>Restant</span>
+          <span className={`val ${rem>=0?'ok':'warn'}`}>{fmt(rem)}</span>
+        </div>
+        <div className="bbar-prog"><div className="bbar-fill" style={{width:`${fillPct}%`,background:rem>=0?'var(--blue)':'var(--red)'}} /></div>
+      </div>
+
+      <div className="sec-label">Paramètres</div>
+      {Object.values(PRODUCTS_META).filter(m=>selected[m.id]).map(meta=>(
+        <div className="psec" key={meta.id}>
+          <div className="psec-head">
+            <i className={`ti ${meta.icon}`} style={{color:meta.color}} />{meta.name}
+          </div>
+          {meta.id==='etf'
+            ? <ETFPortfolio p={params.etf} onChange={handleETFProp} />
+            : meta.params.map(p=>(
+                <div className="prow" key={p.key}>
+                  <label>{p.label}</label>
+                  <input type="number" value={params[meta.id][p.key]} min={p.min} max={p.max} step={p.step}
+                    onChange={e=>handleParam(meta.id,p.key,e.target.value)} />
+                  <span className="unit">{p.unit}</span>
+                </div>
+              ))
+          }
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ── Results ────────────────────────────────────────────────────────────────
+function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
+  const [horizon, setHorizon] = useState(10);
+  const keys = Object.keys(PRODUCTS_META).filter(k=>selected[k]);
+  const year0 = new Date().getFullYear();
+  const labels = Array.from({length:horizon+1},(_,i)=>i===0?'Auj.':(year0+i)+'');
+
+  if (!keys.length) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--t3)',fontSize:13}}>
+      Sélectionnez au moins un produit
+    </div>
+  );
+
+  const projs={};
+  keys.forEach(k=>{ projs[k]=projectProduct(k,params[k],horizon,monthlySaving,savingsTarget); });
+  const totalFinal=keys.reduce((s,k)=>s+(projs[k][horizon]||0),0);
+  const totalInit =keys.reduce((s,k)=>s+(projs[k][0]||0),0);
+  const gain=totalFinal-totalInit, perf=totalInit>0?((totalFinal/totalInit-1)*100):0;
+
+  const savingsVals = monthlySaving>0 ? projectSavingsOnly(savingsTarget,params,horizon,monthlySaving) : null;
+  const savingsDataset = savingsVals ? {
+    label:`DCA seul (${monthlySaving}€/mois)`,data:savingsVals,
+    borderColor:'#9ca3af',backgroundColor:'transparent',
+    borderDash:[4,4],fill:false,tension:0.3,borderWidth:1.5,pointRadius:1,pointHoverRadius:3,
+  } : null;
+
+  const projConfig={
+    type:'line',
+    data:{labels,datasets:[
+      ...keys.map(k=>({
+        label:PRODUCTS_META[k].name,data:projs[k],
+        borderColor:COLORS[k],backgroundColor:COLORS[k]+'18',
+        borderDash:DASH[k],fill:false,tension:0.35,borderWidth:2,pointRadius:2,pointHoverRadius:4,
+      })),
+      ...(savingsDataset?[savingsDataset]:[]),
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},
+      scales:{
+        x:{ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.08)'}},
+        y:{ticks:{color:'#888780',font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(136,135,128,0.08)'}},
+      },
+    },
+  };
+
+  // Cashflow
+  const cfItems = keys.map(k=>({id:k,name:PRODUCTS_META[k].name,...getCFData(k,params[k],monthlySaving)}));
+  const totalCFNet = cfItems.reduce((s,d)=>s+d.net,0);
+
+  // Cashflow chart with detailed immo tooltip
+  const cfConfig={
+    type:'bar',
+    data:{
+      labels:cfItems.map(d=>d.name),
+      datasets:[
+        {label:'Revenus', data:cfItems.map(d=>d.revenus), backgroundColor:cfItems.map(d=>COLORS[d.id]+'99')},
+        {label:'Charges', data:cfItems.map(d=>-d.couts),  backgroundColor:'#E24B4A44'},
+        {label:'Net',     data:cfItems.map(d=>d.net),     backgroundColor:cfItems.map(d=>d.net>=0?COLORS[d.id]:'#E24B4A'),borderRadius:3},
+      ],
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          mode:'index',
+          callbacks:{
+            label: c => c.dataset.label+': '+fmt(c.raw)+'/mois',
+            afterBody: items => {
+              if(!items.length)return[];
+              const idx=items[0].dataIndex;
+              const item=cfItems[idx];
+              if(!item||!item.detail)return[];
+              const lines=[''];
+              if(item.detail.revenus){
+                lines.push('── Revenus ──');
+                item.detail.revenus.forEach(r=>lines.push(`${r.l}: ${fmtSign(r.v)} €`));
+              }
+              if(item.detail.charges){
+                lines.push('── Charges ──');
+                item.detail.charges.forEach(r=>lines.push(`${r.l}: ${fmtSign(r.v)} €`));
+              }
+              if(item.detail.items){
+                item.detail.items.forEach(r=>{ if(r.v!==0) lines.push(`${r.l}: ${fmtSign(r.v)} €`); });
+              }
+              return lines;
+            },
+          },
+        },
+      },
+      scales:{
+        x:{ticks:{color:'#888780',font:{size:10}}},
+        y:{ticks:{color:'#888780',font:{size:10},callback:v=>fmt(v)},grid:{color:'rgba(136,135,128,0.08)'}},
+      },
+    },
+  };
+
+  return (
+    <>
+      <div className="rblock">
+        <div className="rhead">
+          <span className="rhead-title">Projection patrimoniale</span>
+          <div className="horizon-row">
+            {[5,10,15,20].map(h=>(
+              <button key={h} className={`hbtn ${horizon===h?'active':''}`} onClick={()=>setHorizon(h)}>{h} ans</button>
+            ))}
+          </div>
+        </div>
+        <div className="kpi-row">
+          <div className="kpi"><div className="kpi-label">Patrimoine final</div><div className="kpi-val">{fmtK(totalFinal)}</div></div>
+          <div className="kpi"><div className="kpi-label">Gain estimé</div>
+            <div className="kpi-val" style={{color:gain>=0?'var(--green)':'var(--red)'}}>{gain>=0?'+':''}{fmtK(gain)}</div></div>
+          <div className="kpi"><div className="kpi-label">Performance</div><div className="kpi-val">{perf.toFixed(1)}%</div></div>
+          <div className="kpi"><div className="kpi-label">Capital investi</div><div className="kpi-val">{fmtK(totalInit)}</div></div>
+        </div>
+        <div className="legend">
+          {keys.map(k=><span key={k}><span className="ldot" style={{background:COLORS[k]}} />{PRODUCTS_META[k].name} — {fmtK(projs[k][horizon])}</span>)}
+          {savingsVals&&<span><span className="ldot" style={{background:'#9ca3af',opacity:.7}} />DCA seul — {fmtK(savingsVals[horizon])}</span>}
+        </div>
+        <div className="chart-wrap"><ChartCanvas config={projConfig} /></div>
+      </div>
+
+      <div className="rblock">
+        <div className="rhead">
+          <span className="rhead-title">Cashflow mensuel</span>
+          <div style={{fontSize:12,color:'var(--t2)'}}>
+            Net total <strong style={{color:totalCFNet>=0?'var(--green)':'var(--red)'}}>{fmtSign(totalCFNet)}/mois</strong>
+          </div>
+        </div>
+        <div className="legend">
+          {cfItems.map(d=><span key={d.id}><span className="ldot" style={{background:COLORS[d.id]}} />{d.name}</span>)}
+        </div>
+        <div className="chart-wrap" style={{height:160}}><ChartCanvas config={cfConfig} /></div>
+
+        <div className="cf-breakdown">
+          {cfItems.map(d=>(
+            <div className="cf-prod" key={d.id}>
+              <div className="cf-prod-name">
+                <i className={`ti ${PRODUCTS_META[d.id].icon}`} style={{color:COLORS[d.id]}} />
+                {d.name}
+              </div>
+              <div className="cf-equation">
+                <span className="cf-chip rev">+{fmt(d.revenus)} revenus</span>
+                <span className="cf-op">−</span>
+                <span className="cf-chip cst">{fmt(d.couts)} charges</span>
+                <span className="cf-op">=</span>
+                <span className={`cf-chip ${d.net>=0?'net-pos':'net-neg'}`} style={{fontSize:13}}>
+                  {fmtSign(d.net)}/mois
+                </span>
+              </div>
+            </div>
+          ))}
+          <div className="cf-total-row">
+            <span>Total net mensuel</span>
+            <span style={{color:totalCFNet>=0?'var(--green)':'var(--red)'}}>{fmtSign(totalCFNet)}/mois</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+function App() {
+  const [tabs, setTabs] = useState(()=>{
+    const saved=loadRoot();
+    if(saved?.tabs?.length) return saved.tabs.map(t=>({...mkTab(t.name),...mergeState(t),id:t.id,name:t.name}));
+    return [mkTab('Scénario 1')];
+  });
+  const [activeId, setActiveId] = useState(()=>{
+    const saved=loadRoot(); return saved?.activeId||null;
+  });
+  const [savedAt,setSavedAt]=useState(null);
+
+  const activeIdx = tabs.findIndex(t=>t.id===activeId);
+  const realIdx   = activeIdx>=0?activeIdx:0;
+  const active    = tabs[realIdx];
+
+  useEffect(()=>{ saveRoot({tabs,activeId:tabs[realIdx]?.id}); setSavedAt(new Date()); },[tabs,activeId]);
+
+  const updateActive = useCallback(patch=>{
+    setTabs(ts=>ts.map((t,i)=>i===realIdx?{...t,...patch}:t));
+  },[realIdx]);
+
+  const addTab=()=>{
+    const t=mkTab(`Scénario ${tabs.length+1}`,active);
+    setTabs(ts=>[...ts,t]); setActiveId(t.id);
+  };
+  const delTab=id=>{
+    const newTabs=tabs.filter(t=>t.id!==id);
+    setTabs(newTabs);
+    if(tabs[realIdx]?.id===id) setActiveId(newTabs[0]?.id??null);
+  };
+  const renameTab=(id,name)=>setTabs(ts=>ts.map(t=>t.id===id?{...t,name}:t));
+
+  return (
+    <div id="root" style={{display:'flex',flexDirection:'column',height:'100vh'}}>
+      <div className="topbar">
+        <span className="topbar-title">Simulateur patrimoine</span>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {savedAt&&<span className="saved-badge"><i className="ti ti-check"/>Sauvegardé</span>}
+          <button className="btn-ghost" onClick={()=>{ if(confirm('Réinitialiser ce scénario ?')) updateActive(mkDefaults()); }}>
+            Réinitialiser
+          </button>
+        </div>
+      </div>
+      <TabBar tabs={tabs} activeId={tabs[realIdx]?.id} onSwitch={setActiveId} onAdd={addTab} onRename={renameTab} onDelete={delTab} />
+      <div className="columns">
+        <div className="left"><Config state={active} update={updateActive} /></div>
+        <div className="right">
+          <Results selected={active.selected} params={active.params} monthlySaving={active.monthlySaving} savingsTarget={active.savingsTarget||'etf'} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
