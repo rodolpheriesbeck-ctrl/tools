@@ -33,6 +33,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidde
 .tab-perf.neg{background:rgba(163,45,45,.12);color:var(--red)}
 .tab-del{font-size:13px;color:var(--t3);cursor:pointer;line-height:1;padding:2px;border:none;background:none}
 .tab-del:hover{color:var(--red)}
+.risk-badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:.3px}
+.risk-dots{display:flex;gap:2px;align-items:center}
+.risk-dot{width:7px;height:7px;border-radius:50%}
 .tab-edit{font-size:11px;color:var(--t3);cursor:pointer;padding:2px 3px;border:none;background:none;opacity:0;transition:opacity .15s}
 .tab.active .tab-edit{opacity:1}
 .tab-edit:hover{color:var(--blue)}
@@ -78,7 +81,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidde
 .psec-head{display:flex;align-items:center;gap:5px;margin-bottom:8px;font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
 .prow{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .prow:last-child{margin-bottom:0}
-.prow label{flex:1;font-size:12px;color:var(--t1)}
+.prow label{flex:1;font-size:12px;color:var(--t1);display:flex;align-items:center;gap:4px}
+.p-info{position:relative;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--border2);color:var(--t2);font-size:9px;font-weight:700;cursor:help;flex-shrink:0;font-style:normal}
+.p-info:hover{background:var(--blue);color:#fff}
+.p-tip{display:none;position:fixed;width:220px;background:var(--surf);border:1px solid var(--blue);border-radius:6px;padding:9px 11px;font-size:11px;line-height:1.6;color:var(--t1);z-index:9999;pointer-events:none;white-space:normal;font-weight:400;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+.p-info:hover .p-tip{display:block}
 .prow input{width:80px;font-size:12px;padding:3px 5px;border:1px solid var(--border2);border-radius:var(--rmd);background:var(--surf);color:var(--t1);text-align:right}
 
 /* ETF specific */
@@ -109,6 +116,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidde
 .legend span{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2)}
 .ldot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .chart-wrap{position:relative;width:100%;height:190px}
+.chart-legend-desc{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.cld-row{display:flex;align-items:flex-start;gap:7px;font-size:11px;color:var(--t2);line-height:1.45}
+.cld-dot{flex-shrink:0;width:8px;height:8px;border-radius:50%;margin-top:3px}
+.cld-note{color:var(--t3);font-size:10.5px;padding-top:2px;border-top:1px solid var(--border2);margin-top:2px}
 
 /* cashflow breakdown */
 .cf-breakdown{display:flex;flex-direction:column;gap:7px;margin-top:11px}
@@ -121,6 +132,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--t1);overflow:hidde
 .cf-chip.net-pos{background:rgba(24,95,165,.12);color:var(--blue)}
 .cf-chip.net-neg{background:rgba(163,45,45,.18);color:var(--red)}
 .cf-op{font-size:14px;color:var(--t3);font-weight:300}
+.cf-prod-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.cf-clickable{cursor:pointer}
+.cf-clickable:hover{background:var(--bg2)}
+.cf-toggle{font-size:9px;color:var(--t3);margin-left:4px}
+.cf-detail{margin-top:9px;padding-top:9px;border-top:1px solid var(--border2);display:flex;flex-direction:column;gap:4px}
+.cf-detail-section{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.cf-detail-row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--t2);padding:1px 0}
 .cf-total-row{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--bg);border-radius:var(--rmd);margin-top:2px;font-size:13px;font-weight:600}
 
 /* buttons */
@@ -142,39 +160,70 @@ const { useState, useEffect, useRef, useCallback } = React;
 // ── Constants ──────────────────────────────────────────────────────────────
 const COLORS = { etf:'#185FA5', immo:'#0F6E56', av:'#534AB7', scpi:'#BA7517', fonds:'#888780', livretA:'#E85D04' };
 const DASH   = { etf:[], immo:[6,3], av:[2,2], scpi:[8,4], fonds:[4,4], livretA:[3,3] };
+const RISK   = {
+  1:{ label:'Très faible', color:'#22c55e' },
+  2:{ label:'Faible',      color:'#84cc16' },
+  3:{ label:'Modéré',      color:'#f59e0b' },
+  4:{ label:'Élevé',       color:'#f97316' },
+  5:{ label:'Très élevé',  color:'#ef4444' },
+};
 
 const ETF_PRESETS = [
-  { id:'world',     name:'MSCI World',      ticker:'IWDA', rendement:8.0,  frais:0.20 },
-  { id:'sp500',     name:'S&P 500',          ticker:'SXR8', rendement:9.0,  frais:0.07 },
-  { id:'nasdaq',    name:'NASDAQ 100',       ticker:'CNDX', rendement:12.0, frais:0.22 },
-  { id:'em',        name:'Émergents',        ticker:'IEMA', rendement:5.0,  frais:0.18 },
-  { id:'eurostoxx', name:'Euro Stoxx 600',   ticker:'MEUD', rendement:6.0,  frais:0.07 },
-  { id:'smallcap',  name:'Small Cap World',  ticker:'IUSN', rendement:7.0,  frais:0.35 },
-  { id:'usa',       name:'MSCI USA',         ticker:'CSPX', rendement:9.0,  frais:0.15 },
-  { id:'gold',      name:'Or (ETC)',         ticker:'SGLN', rendement:4.0,  frais:0.15 },
+  { id:'world',     name:'MSCI World',      ticker:'IWDA', rendement:8.0,  frais:0.20, risk:3 },
+  { id:'sp500',     name:'S&P 500',          ticker:'SXR8', rendement:9.0,  frais:0.07, risk:3 },
+  { id:'nasdaq',    name:'NASDAQ 100',       ticker:'CNDX', rendement:12.0, frais:0.22, risk:5 },
+  { id:'em',        name:'Émergents',        ticker:'IEMA', rendement:5.0,  frais:0.18, risk:4 },
+  { id:'eurostoxx', name:'Euro Stoxx 600',   ticker:'MEUD', rendement:6.0,  frais:0.07, risk:3 },
+  { id:'smallcap',  name:'Small Cap World',  ticker:'IUSN', rendement:7.0,  frais:0.35, risk:4 },
+  { id:'usa',       name:'MSCI USA',         ticker:'CSPX', rendement:9.0,  frais:0.15, risk:3 },
+  { id:'gold',      name:'Or (ETC)',         ticker:'SGLN', rendement:4.0,  frais:0.15, risk:3 },
 ];
 
 const PRODUCTS_META = {
-  etf: { id:'etf', name:'ETF / PEA', icon:'ti-chart-bar', color:COLORS.etf,
+  etf: { id:'etf', name:'ETF / PEA', icon:'ti-chart-bar', color:COLORS.etf, risk:4,
     defaults:{ alloc:45000, etfType:'acc', fiscalite:17.2, dividendYield:2.0,
                portfolio: ETF_PRESETS.map((e,i)=>({presetId:e.id,pct:i===0?60:i===1?40:0})) },
     params:[] },
-  immo: { id:'immo', name:'Immo locatif', icon:'ti-home', color:COLORS.immo,
+  immo: { id:'immo', name:'Immo locatif', icon:'ti-home', color:COLORS.immo, risk:2,
     defaults:{ alloc:15000, prixBien:135000, loyer:900, tauxOccupation:60, fraisGestion:20,
-               charges:72, taxeFonciere:1200, creditTaux:3.5, creditDuree:20, apport:15000, revalo:1 },
+               charges:72, taxeFonciere:1200, creditTaux:3.5, creditDuree:20, apport:15000, revalo:1,
+               taxeOrdures:300, taxeHabitation:800, regimeLMNP:'micro-bic', tauxIR:30,
+               amortissementBien:2.5, valeurMobilier:5000, amortissementMobilier:10 },
     params:[
-      { key:'prixBien',       label:'Prix du bien',    unit:'€',      min:50000, max:500000, step:1000 },
-      { key:'apport',         label:'Apport',          unit:'€',      min:5000,  max:100000, step:1000 },
-      { key:'loyer',          label:'Loyer/sem (HS)',  unit:'€',      min:100,   max:2000,   step:50   },
-      { key:'tauxOccupation', label:"Taux occupation", unit:'%',      min:20,    max:95,     step:5    },
-      { key:'fraisGestion',   label:'Frais gestion',   unit:'%',      min:0,     max:35,     step:1    },
-      { key:'charges',        label:'Charges copro',   unit:'€/mois', min:0,     max:500,    step:10   },
-      { key:'taxeFonciere',   label:'Taxe foncière',   unit:'€/an',   min:0,     max:3000,   step:100  },
-      { key:'creditTaux',     label:'Taux crédit',     unit:'%',      min:1,     max:6,      step:0.1  },
-      { key:'creditDuree',    label:'Durée crédit',    unit:'ans',    min:10,    max:25,     step:1    },
-      { key:'revalo',         label:'Revalorisation',  unit:'%/an',   min:0,     max:5,      step:0.5  },
+      { key:'prixBien',              label:'Prix du bien',          unit:'€',    min:50000, max:500000, step:1000,
+        info:"Prix total d'acquisition. Si vous avez des frais de notaire (~8%), incluez-les ici." },
+      { key:'apport',                label:'Apport',                unit:'€',    min:5000,  max:100000, step:1000,
+        info:"Capital personnel investi. Le reste est financé par crédit. Synchronisé avec l'allocation initiale du produit." },
+      { key:'loyer',                 label:'Loyer/sem (HS)',        unit:'€',    min:100,   max:2000,   step:50,
+        info:"Loyer hebdomadaire en location meublée courte durée (Airbnb, Abritel…). Converti en mensuel : loyer × 52 ÷ 12." },
+      { key:'tauxOccupation',        label:'Taux occupation',       unit:'%',    min:20,    max:95,     step:5,
+        info:"% de semaines effectivement louées. 60% ≈ 31 semaines/an. Tient compte des vacances, nettoyage et saisonnalité." },
+      { key:'fraisGestion',          label:'Frais gestion',         unit:'%',    min:0,     max:35,     step:1,
+        info:"Commission de la plateforme ou conciergerie (Airbnb ~3%, Abritel ~5%, gestion complète ~20%). Prélevée sur le loyer brut." },
+      { key:'charges',               label:'Charges copro',         unit:'€/mois',min:0,   max:500,    step:10,
+        info:"Charges de copropriété mensuelles : entretien parties communes, ascenseur, assurance immeuble, eau communes." },
+      { key:'taxeFonciere',          label:'Taxe foncière',         unit:'€/an', min:0,    max:5000,   step:100,
+        info:"Impôt foncier annuel dû par le propriétaire. Non récupérable sur le locataire en location meublée (hors TEOM)." },
+      { key:'taxeOrdures',           label:'Taxe ordures ménagères',unit:'€/an', min:0,    max:1000,   step:25,
+        info:"TEOM incluse dans la taxe foncière. Techniquement récupérable sur le locataire, mais souvent absorbée en meublé courte durée." },
+      { key:'taxeHabitation',        label:'Taxe hab. rés. sec.',   unit:'€/an', min:0,    max:5000,   step:100,
+        info:"Maintenue pour les résidences secondaires depuis 2023. S'applique aux LMNP non classés tourisme. Variable selon la commune (souvent majoration 5-60%)." },
+      { key:'creditTaux',            label:'Taux crédit',           unit:'%',    min:1,    max:6,      step:0.1,
+        info:"Taux d'intérêt annuel du prêt immobilier. En 2024-2025, les taux sont autour de 3.5-4.5% sur 20 ans pour un investissement locatif." },
+      { key:'creditDuree',           label:'Durée crédit',          unit:'ans',  min:10,   max:25,     step:1,
+        info:"Durée totale du remboursement. Plus la durée est longue → mensualité plus faible, mais intérêts totaux plus élevés." },
+      { key:'revalo',                label:'Revalorisation',        unit:'%/an', min:0,    max:5,      step:0.5,
+        info:"Taux de revalorisation annuelle estimé du bien. Moyenne nationale ~2%/an sur le long terme, variable selon la zone géographique." },
+      { key:'tauxIR',                label:'Taux marginal IR',      unit:'%',    min:0,    max:45,     step:5,
+        info:"Votre tranche marginale d'imposition (TMI) : 11%, 30%, 41% ou 45%. Utilisée pour calculer l'impôt sur les revenus LMNP (Micro-BIC ou réel)." },
+      { key:'amortissementBien',     label:'Amort. bien',           unit:'%/an', min:1,    max:5,      step:0.1, reelOnly:true,
+        info:"En LMNP réel, le bâtiment (hors terrain ~15-20%) s'amortit sur 30-40 ans → 2.5-3.3%/an. Réduit fortement le bénéfice imposable." },
+      { key:'valeurMobilier',        label:'Valeur mobilier LMNP',  unit:'€',    min:0,    max:50000,  step:500, reelOnly:true,
+        info:"Valeur totale du mobilier et équipements (literie, électroménager, déco). Amortissable sur 5-10 ans en régime réel LMNP." },
+      { key:'amortissementMobilier', label:'Amort. mobilier',       unit:'%/an', min:5,    max:25,     step:1,   reelOnly:true,
+        info:"Taux d'amortissement annuel du mobilier. Durée de vie fiscale 5-10 ans → 10-20%/an. Réduit encore le bénéfice imposable." },
     ]},
-  av:   { id:'av',   name:'Assurance-vie', icon:'ti-shield', color:COLORS.av,
+  av:   { id:'av',   name:'Assurance-vie', icon:'ti-shield', color:COLORS.av, risk:3,
     defaults:{ alloc:10000, rendement:4.5, fraisEnvelope:0.6, fraisFonds:0.8, fiscaliteAv8:7.5 },
     params:[
       { key:'rendement',    label:'Rendement UC',       unit:'%', min:1, max:12,  step:0.5 },
@@ -182,7 +231,7 @@ const PRODUCTS_META = {
       { key:'fraisFonds',   label:'Frais fonds UC',     unit:'%', min:0, max:2,   step:0.1 },
       { key:'fiscaliteAv8', label:'Fiscalité > 8 ans',  unit:'%', min:0, max:30,  step:0.5 },
     ]},
-  scpi: { id:'scpi', name:'SCPI', icon:'ti-building', color:COLORS.scpi,
+  scpi: { id:'scpi', name:'SCPI', icon:'ti-building', color:COLORS.scpi, risk:3,
     defaults:{ alloc:10000, rendement:4.5, fraisEntree:8, fraisGestion:12, retenueSource:12.8, revalo:0.5 },
     params:[
       { key:'rendement',     label:'Taux distribution', unit:'%',    min:2,  max:8,  step:0.25 },
@@ -191,14 +240,14 @@ const PRODUCTS_META = {
       { key:'retenueSource', label:'Fiscalité (IR+PS)', unit:'%',    min:0,  max:50, step:1    },
       { key:'revalo',        label:'Revalorisation',    unit:'%/an', min:-2, max:4,  step:0.25 },
     ]},
-  fonds:{ id:'fonds', name:'Fonds euros', icon:'ti-lock', color:COLORS.fonds,
+  fonds:{ id:'fonds', name:'Fonds euros', icon:'ti-lock', color:COLORS.fonds, risk:1,
     defaults:{ alloc:0, rendement:2.5, fraisEnvelope:0.6, fiscalite:17.2 },
     params:[
       { key:'rendement',    label:'Rendement annuel', unit:'%', min:1, max:5,   step:0.25 },
       { key:'fraisEnvelope',label:"Frais enveloppe",  unit:'%', min:0, max:1.5, step:0.1  },
       { key:'fiscalite',    label:'Fiscalité',         unit:'%', min:0, max:30,  step:0.5  },
     ]},
-  livretA:{ id:'livretA', name:'Livret A', icon:'ti-pig-money', color:COLORS.livretA,
+  livretA:{ id:'livretA', name:'Livret A', icon:'ti-pig-money', color:COLORS.livretA, risk:1,
     defaults:{ alloc:10000, rendement:3.0, mensuel:100, plafond:22950 },
     params:[
       { key:'rendement', label:'Taux d\'intérêt',   unit:'%', min:0.5, max:5,     step:0.25 },
@@ -228,15 +277,61 @@ function computeETFBlend(portfolio) {
   };
 }
 
+function computeETFRisk(portfolio) {
+  const active = (portfolio||[]).filter(p => p.pct > 0);
+  const total  = active.reduce((s,p) => s+p.pct, 0);
+  if (total === 0) return 3;
+  const raw = active.reduce((s,p) => {
+    const e = ETF_PRESETS.find(e=>e.id===p.presetId);
+    return s + (p.pct/total) * (e?.risk||3);
+  }, 0);
+  return Math.min(5, Math.max(1, Math.round(raw * 10) / 10));
+}
+
+// Retourne le niveau de risque effectif d'un produit (ETF = dynamique selon blend)
+function getProductRisk(id, p) {
+  if (id === 'etf') return computeETFRisk(p.portfolio);
+  return PRODUCTS_META[id]?.risk || 3;
+}
+
 function calcImmoMonthly(p) {
   const montant = p.prixBien - p.apport;
   const r = p.creditTaux/100/12, n = p.creditDuree*12;
   const mensualite = r===0 ? montant/n : montant*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
   const loyerBrut  = (p.loyer*52/12)*(p.tauxOccupation/100);
-  const fraisGestionMens = loyerBrut*p.fraisGestion/100;
+  const fraisGestionMens = loyerBrut*(p.fraisGestion||0)/100;
   const loyerNet   = loyerBrut - fraisGestionMens;
-  const charges    = p.charges + p.taxeFonciere/12;
-  return { mensualite, loyerBrut, fraisGestionMens, loyerNet, charges, cashflow: loyerNet - mensualite - charges };
+  const copro      = p.charges||0;
+  const taxFonc    = (p.taxeFonciere||0)/12;
+  const taxOrd     = (p.taxeOrdures||0)/12;
+  const taxHab     = (p.taxeHabitation||0)/12;
+  const chargesMens = copro + taxFonc + taxOrd + taxHab;
+
+  // Fiscalité LMNP
+  const tauxIR = (p.tauxIR||30)/100;
+  let impotMensuel = 0;
+  let amortAnnuel = 0;
+  let beneficeImposable = 0;
+
+  if (p.regimeLMNP === 'reel') {
+    amortAnnuel = p.prixBien*(p.amortissementBien||2.5)/100
+                + (p.valeurMobilier||5000)*(p.amortissementMobilier||10)/100;
+    const interetAnnuel = montant * r * 12;
+    const chargesDeduct = fraisGestionMens*12 + chargesMens*12 + interetAnnuel;
+    beneficeImposable = Math.max(0, loyerBrut*12 - chargesDeduct - amortAnnuel);
+    impotMensuel = beneficeImposable * tauxIR / 12;
+  } else {
+    // Micro-BIC : abattement 50%
+    beneficeImposable = loyerBrut * 12 * 0.5;
+    impotMensuel = beneficeImposable * tauxIR / 12;
+  }
+
+  return {
+    mensualite, loyerBrut, fraisGestionMens, loyerNet,
+    copro, taxFonc, taxOrd, taxHab, chargesMens,
+    impotMensuel, amortAnnuel, beneficeImposable,
+    cashflow: loyerNet - mensualite - chargesMens - impotMensuel,
+  };
 }
 
 function getSavingsRate(savingsTarget, params) {
@@ -298,9 +393,10 @@ function projectProduct(id, p, years, monthlySaving, savingsTarget) {
   }
   if (id === 'livretA') {
     const rate=p.rendement/100/12, cap=p.plafond||22950;
+    const mensuelTotal = monthly + (p.mensuel||0); // DCA global + versement dédié Livret A
     let val=p.alloc||0; const vals=[val];
     for(let y=1;y<=years;y++){
-      for(let m=0;m<12;m++){ val=val*(1+rate); if(val<cap&&monthly>0) val=Math.min(val+monthly,cap); }
+      for(let m=0;m<12;m++){ val=val*(1+rate); if(val<cap&&mensuelTotal>0) val=Math.min(val+mensuelTotal,cap); }
       vals.push(val);
     }
     return vals;
@@ -321,19 +417,28 @@ function getCFData(id, p, monthlySaving) {
   }
   if (id==='immo') {
     const m = calcImmoMonthly(p);
+    const regimeLabel = p.regimeLMNP==='reel' ? 'Réel' : 'Micro-BIC';
+    const fiscLabel   = p.regimeLMNP==='reel'
+      ? `Impôt réel (IR ${p.tauxIR||30}%, bén. ${Math.round(m.beneficeImposable)}€/an)`
+      : `Impôt Micro-BIC (50%×IR ${p.tauxIR||30}%)`;
     return {
       revenus: Math.round(m.loyerNet),
-      couts:   Math.round(m.mensualite+m.charges),
+      couts:   Math.round(m.mensualite + m.chargesMens + m.impotMensuel),
       net:     Math.round(m.cashflow),
       detail:{
         revenus:[
-          {l:'Loyer brut',          v:Math.round(m.loyerBrut)},
-          {l:`Frais gestion (${p.fraisGestion}%)`, v:-Math.round(m.fraisGestionMens)},
+          {l:'Loyer brut',                          v: Math.round(m.loyerBrut)},
+          {l:`Frais gestion (${p.fraisGestion||0}%)`,v:-Math.round(m.fraisGestionMens)},
         ],
         charges:[
           {l:`Crédit (${p.creditDuree}a à ${p.creditTaux}%)`, v:-Math.round(m.mensualite)},
-          {l:'Charges copro',       v:-Math.round(p.charges)},
-          {l:'Taxe foncière',       v:-Math.round(p.taxeFonciere/12)},
+          {l:'Charges copro',                        v:-Math.round(m.copro)},
+          {l:'Taxe foncière',                        v:-Math.round(m.taxFonc)},
+          ...(m.taxOrd>0  ? [{l:'Taxe ordures ménag.',       v:-Math.round(m.taxOrd)}]  : []),
+          ...(m.taxHab>0  ? [{l:'Taxe hab. rés. sec.',        v:-Math.round(m.taxHab)}]  : []),
+          {l:fiscLabel,                              v:-Math.round(m.impotMensuel)},
+          ...(p.regimeLMNP==='reel' && m.amortAnnuel>0
+            ? [{l:`Amort. LMNP réel (${Math.round(m.amortAnnuel)}€/an, non cash)`, v:0}] : []),
         ],
       },
     };
@@ -354,9 +459,28 @@ function getCFData(id, p, monthlySaving) {
   }
   if (id==='livretA') {
     const rev=Math.round((p.alloc||0)*p.rendement/100/12);
-    return { revenus:rev, couts:0, net:rev, detail:{ items:[{l:'Intérêts (défiscalisés)',v:rev}] } };
+    const vers=Math.round(p.mensuel||0);
+    return { revenus:rev, couts:vers, net:rev-vers,
+             detail:{ items:[{l:'Intérêts (défiscalisés)',v:rev},...(vers?[{l:'Versement mensuel',v:-vers}]:[])] }};
   }
   return { revenus:0, couts:0, net:0, detail:{items:[]} };
+}
+
+// Coût de revient = apport initial + DCA versé sur la durée
+function getCostBasis(id, p, horizon, monthlySaving, savingsTarget) {
+  const monthly = (SAVINGS_CAPABLE.includes(id) && id === savingsTarget) ? monthlySaving : 0;
+  const mensuel = id === 'livretA' ? (p.mensuel || 0) : 0;
+  return (p.alloc || 0) + (monthly + mensuel) * 12 * horizon;
+}
+
+// Valeur nette après fiscalité de sortie
+function netAfterTax(id, p, grossFinal, costBasis) {
+  const gain = Math.max(0, grossFinal - costBasis);
+  if (id === 'etf' && p.etfType === 'acc') return grossFinal - gain * (p.fiscalite || 17.2) / 100;
+  if (id === 'etf' && p.etfType === 'dist') return grossFinal; // taxation annuelle déjà dans la projection
+  if (id === 'av')    return grossFinal - gain * (p.fiscaliteAv8 || 7.5) / 100;
+  if (id === 'fonds') return grossFinal - gain * (p.fiscalite || 17.2) / 100;
+  return grossFinal; // scpi, immo, livretA : pas de fiscalité de sortie simplifiée ici
 }
 
 function computeTabPerf(tabState) {
@@ -389,6 +513,21 @@ function mergeState(saved) {
 const mkTab = (name, state) => ({ id: Date.now()+Math.random(), name, ...mergeState(state) });
 
 // ── ChartCanvas ────────────────────────────────────────────────────────────
+function InfoTip({ text }) {
+  const [pos, setPos] = useState(null);
+  const ref = useRef(null);
+  const show = () => {
+    const r = ref.current.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.left - 95, window.innerWidth - 232));
+    setPos({ top: r.bottom + 6, left });
+  };
+  return (
+    <span ref={ref} className="p-info" onMouseEnter={show} onMouseLeave={()=>setPos(null)}>i
+      {pos && <span className="p-tip" style={{top:pos.top,left:pos.left}}>{text}</span>}
+    </span>
+  );
+}
+
 function ChartCanvas({ config }) {
   const ref=useRef(null), chart=useRef(null);
   useEffect(()=>{
@@ -404,6 +543,8 @@ function ChartCanvas({ config }) {
 function TabBar({ tabs, activeId, onSwitch, onAdd, onRename, onDelete }) {
   const [editing, setEditing] = useState(null);
   const [editVal, setEditVal] = useState('');
+  const inputRef = useRef(null);
+  useEffect(()=>{ if(editing && inputRef.current){ inputRef.current.focus(); inputRef.current.select(); } },[editing]);
   const startEdit=(id,name,e)=>{ e.preventDefault(); e.stopPropagation(); setEditing(id); setEditVal(name); };
   const commitEdit=(id)=>{ if(editVal.trim()) onRename(id,editVal.trim()); setEditing(null); };
   return (
@@ -414,7 +555,7 @@ function TabBar({ tabs, activeId, onSwitch, onAdd, onRename, onDelete }) {
         return (
           <div key={tab.id} className={`tab ${active?'active':''}`} onClick={()=>onSwitch(tab.id)}>
             {editing===tab.id
-              ? <input className="tab-name-input" autoFocus value={editVal}
+              ? <input ref={inputRef} className="tab-name-input" value={editVal}
                   onChange={e=>setEditVal(e.target.value)}
                   onBlur={()=>commitEdit(tab.id)}
                   onKeyDown={e=>{ if(e.key==='Enter')commitEdit(tab.id); if(e.key==='Escape')setEditing(null); e.stopPropagation(); }}
@@ -510,6 +651,7 @@ function Config({ state, update }) {
     if(id==='immo'&&k==='apport') p.alloc=val;
     update({ params:{...params,[id]:p} });
   };
+  const handleParamRaw = (id,k,v) => update({ params:{...params,[id]:{...params[id],[k]:v}} });
   const handleETFProp= (k,v) => update({ params:{...params,etf:{...params.etf,[k]:v}} });
   return (
     <>
@@ -563,19 +705,67 @@ function Config({ state, update }) {
       <div className="sec-label">Paramètres</div>
       {Object.values(PRODUCTS_META).filter(m=>selected[m.id]).map(meta=>(
         <div className="psec" key={meta.id}>
-          <div className="psec-head">
-            <i className={`ti ${meta.icon}`} style={{color:meta.color}} />{meta.name}
-          </div>
+          {(()=>{
+            const rk = Math.min(5,Math.max(1,Math.round(getProductRisk(meta.id,params[meta.id])*10)/10));
+            const ri = RISK[rk];
+            return (
+              <div className="psec-head">
+                <i className={`ti ${meta.icon}`} style={{color:meta.color}} />{meta.name}
+                <span style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:5}}>
+                  <span className="risk-dots">
+                    {[1,2,3,4,5].map(i=>(
+                      <span key={i} className="risk-dot"
+                        style={{background:i<=rk?ri.color:'var(--border2)'}} />
+                    ))}
+                  </span>
+                  <span className="risk-badge" style={{background:ri.color+'22',color:ri.color}}>
+                    {ri.label}
+                  </span>
+                </span>
+              </div>
+            );
+          })()}
           {meta.id==='etf'
             ? <ETFPortfolio p={params.etf} onChange={handleETFProp} />
-            : meta.params.map(p=>(
-                <div className="prow" key={p.key}>
-                  <label>{p.label}</label>
-                  <input type="number" value={params[meta.id][p.key]} min={p.min} max={p.max} step={p.step}
-                    onChange={e=>handleParam(meta.id,p.key,e.target.value)} />
-                  <span className="unit">{p.unit}</span>
-                </div>
-              ))
+            : <>
+                {meta.id==='immo' && (
+                  <>
+                    <div className="prow" style={{alignItems:'center'}}>
+                      <label>Régime LMNP
+                        <InfoTip text={<>
+                          <strong>Micro-BIC</strong> : abattement forfaitaire 50% sur loyer brut, imposé à votre TMI. Simple mais moins optimisé.<br/><br/>
+                          <strong>Régime réel</strong> : déduction des charges réelles + amortissement bien + mobilier. Bénéfice souvent nul → 0 impôt.
+                        </>} />
+                      </label>
+                      <div className="etf-toggle" style={{margin:0,flex:1}}>
+                        <button className={`toggle-btn ${params.immo.regimeLMNP!=='reel'?'active':''}`}
+                          onClick={()=>handleParamRaw('immo','regimeLMNP','micro-bic')}>Micro-BIC (50%)</button>
+                        <button className={`toggle-btn ${params.immo.regimeLMNP==='reel'?'active':''}`}
+                          onClick={()=>handleParamRaw('immo','regimeLMNP','reel')}>Régime réel</button>
+                      </div>
+                    </div>
+                    {params.immo.regimeLMNP==='reel' && (
+                      <div style={{fontSize:11,color:'var(--green)',padding:'2px 0 4px',opacity:.8}}>
+                        Amortissement bien + mobilier → bénéfice souvent nul
+                      </div>
+                    )}
+                  </>
+                )}
+                {meta.params
+                  .filter(pm=>!pm.reelOnly || (meta.id==='immo' && params.immo.regimeLMNP==='reel'))
+                  .map(pm=>(
+                    <div className="prow" key={pm.key}>
+                      <label>
+                        {pm.label}
+                        {pm.info && <InfoTip text={pm.info} />}
+                      </label>
+                      <input type="number" value={params[meta.id][pm.key]??''} min={pm.min} max={pm.max} step={pm.step}
+                        onChange={e=>handleParam(meta.id,pm.key,e.target.value)} />
+                      <span className="unit">{pm.unit}</span>
+                    </div>
+                  ))
+                }
+              </>
           }
         </div>
       ))}
@@ -586,6 +776,7 @@ function Config({ state, update }) {
 // ── Results ────────────────────────────────────────────────────────────────
 function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
   const [horizon, setHorizon] = useState(10);
+  const [expandedCF, setExpandedCF] = useState(null);
   const keys = Object.keys(PRODUCTS_META).filter(k=>selected[k]);
   const year0 = new Date().getFullYear();
   const labels = Array.from({length:horizon+1},(_,i)=>i===0?'Auj.':(year0+i)+'');
@@ -602,9 +793,48 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
   const totalInit =keys.reduce((s,k)=>s+(projs[k][0]||0),0);
   const gain=totalFinal-totalInit, perf=totalInit>0?((totalFinal/totalInit-1)*100):0;
 
+  // Risque portefeuille pondéré par valeur finale
+  const weightedRisk = totalFinal>0
+    ? keys.reduce((s,k)=>s+(projs[k][horizon]||0)/totalFinal*getProductRisk(k,params[k]),0)
+    : (keys.reduce((s,k)=>s+getProductRisk(k,params[k]),0)/Math.max(1,keys.length));
+  const riskKey = Math.min(5,Math.max(1,Math.round(weightedRisk)));
+
+  // Calcul net après fiscalité de sortie par produit
+  const totalFinalNet = keys.reduce((s,k)=>{
+    const gross = projs[k][horizon]||0;
+    const basis = getCostBasis(k, params[k], horizon, monthlySaving, savingsTarget);
+    return s + netAfterTax(k, params[k], gross, basis);
+  }, 0);
+  const totalCostBasis = keys.reduce((s,k)=>s+getCostBasis(k,params[k],horizon,monthlySaving,savingsTarget),0);
+  const gainNet = totalFinalNet - totalCostBasis;
+  const taxTotal = totalFinal - totalFinalNet;
+
   const savingsVals = monthlySaving>0 ? projectSavingsOnly(savingsTarget,params,horizon,monthlySaving) : null;
-  const savingsDataset = savingsVals ? {
-    label:`DCA seul (${monthlySaving}€/mois)`,data:savingsVals,
+
+  // ── Gain net par produit pour le graphique ────────────────────────────────
+  // Chaque point = valeur[t] - coût investi[t]
+  // Dernière année : fiscalité de sortie appliquée → gain net après impôt
+  // Pour l'immo : projs[k] = équité seule (valeur bien - capital dû), sans cashflows.
+  // On précalcule le cashflow mensuel constant pour l'ajouter cumulé à chaque année.
+  const immoCfMonthly = keys.includes('immo') ? calcImmoMonthly(params.immo).cashflow : 0;
+  const gainProjs = {};
+  keys.forEach(k => {
+    gainProjs[k] = projs[k].map((val, t) => {
+      const basis = getCostBasis(k, params[k], t, monthlySaving, savingsTarget);
+      // L'immo n'inclut pas les cashflows dans la projection — on les cumule ici.
+      const effectiveVal = k === 'immo' ? val + immoCfMonthly * 12 * t : val;
+      if (t < horizon) return Math.round(effectiveVal - basis);
+      return Math.round(netAfterTax(k, params[k], effectiveVal, basis) - basis);
+    });
+  });
+
+  // Gain DCA seul (courbe de référence épargne pure)
+  const savingsGain = savingsVals ? savingsVals.map((v, t) => {
+    const basis = monthlySaving * 12 * t; // coût pur DCA, sans capital initial
+    return Math.round(v - basis);
+  }) : null;
+  const savingsDataset = savingsGain ? {
+    label:`DCA seul (${monthlySaving}€/mois)`,data:savingsGain,
     borderColor:'#9ca3af',backgroundColor:'transparent',
     borderDash:[4,4],fill:false,tension:0.3,borderWidth:1.5,pointRadius:1,pointHoverRadius:3,
   } : null;
@@ -612,8 +842,12 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
   const projConfig={
     type:'line',
     data:{labels,datasets:[
+      // Ligne de breakeven (y=0)
+      {label:'Breakeven',data:Array(horizon+1).fill(0),
+       borderColor:'rgba(255,255,255,0.18)',backgroundColor:'transparent',
+       borderDash:[3,3],fill:false,tension:0,borderWidth:1,pointRadius:0,pointHoverRadius:0},
       ...keys.map(k=>({
-        label:PRODUCTS_META[k].name,data:projs[k],
+        label:PRODUCTS_META[k].name,data:gainProjs[k],
         borderColor:COLORS[k],backgroundColor:COLORS[k]+'18',
         borderDash:DASH[k],fill:false,tension:0.35,borderWidth:2,pointRadius:2,pointHoverRadius:4,
       })),
@@ -621,10 +855,19 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.raw)}}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label:c=>c.dataset.label==='Breakeven'?null:c.dataset.label+': '+fmt(c.raw),
+          filter:item=>item.dataset.label!=='Breakeven',
+        }},
+      },
       scales:{
         x:{ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.08)'}},
-        y:{ticks:{color:'#888780',font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(136,135,128,0.08)'}},
+        y:{
+          ticks:{color:'#888780',font:{size:10},callback:v=>fmtK(v)},
+          grid:{color:ctx=>ctx.tick.value===0?'rgba(255,255,255,0.30)':'rgba(136,135,128,0.08)'},
+        },
       },
     },
   };
@@ -650,27 +893,14 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
         legend:{display:false},
         tooltip:{
           mode:'index',
+          backgroundColor:'rgba(22,22,26,0.97)',
+          borderColor:'rgba(255,255,255,0.1)',
+          borderWidth:1,
+          titleColor:'#e8e7e3',
+          bodyColor:'#9ca3af',
+          padding:10,
           callbacks:{
             label: c => c.dataset.label+': '+fmt(c.raw)+'/mois',
-            afterBody: items => {
-              if(!items.length)return[];
-              const idx=items[0].dataIndex;
-              const item=cfItems[idx];
-              if(!item||!item.detail)return[];
-              const lines=[''];
-              if(item.detail.revenus){
-                lines.push('── Revenus ──');
-                item.detail.revenus.forEach(r=>lines.push(`${r.l}: ${fmtSign(r.v)} €`));
-              }
-              if(item.detail.charges){
-                lines.push('── Charges ──');
-                item.detail.charges.forEach(r=>lines.push(`${r.l}: ${fmtSign(r.v)} €`));
-              }
-              if(item.detail.items){
-                item.detail.items.forEach(r=>{ if(r.v!==0) lines.push(`${r.l}: ${fmtSign(r.v)} €`); });
-              }
-              return lines;
-            },
           },
         },
       },
@@ -685,7 +915,7 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
     <>
       <div className="rblock">
         <div className="rhead">
-          <span className="rhead-title">Projection patrimoniale</span>
+          <span className="rhead-title">Gains nets par produit <span style={{fontWeight:400,color:'var(--t3)',fontSize:11}}>(fiscalité déduite à la sortie)</span></span>
           <div className="horizon-row">
             {[5,10,15,20].map(h=>(
               <button key={h} className={`hbtn ${horizon===h?'active':''}`} onClick={()=>setHorizon(h)}>{h} ans</button>
@@ -694,16 +924,47 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
         </div>
         <div className="kpi-row">
           <div className="kpi"><div className="kpi-label">Patrimoine final</div><div className="kpi-val">{fmtK(totalFinal)}</div></div>
-          <div className="kpi"><div className="kpi-label">Gain estimé</div>
-            <div className="kpi-val" style={{color:gain>=0?'var(--green)':'var(--red)'}}>{gain>=0?'+':''}{fmtK(gain)}</div></div>
-          <div className="kpi"><div className="kpi-label">Performance</div><div className="kpi-val">{perf.toFixed(1)}%</div></div>
+          <div className="kpi"><div className="kpi-label">Gain net (fiscal déduit)</div>
+            <div className="kpi-val" style={{color:gainNet>=0?'var(--green)':'var(--red)'}}>{gainNet>=0?'+':''}{fmtK(gainNet)}</div></div>
+          <div className="kpi"><div className="kpi-label">Fiscalité de sortie</div>
+            <div className="kpi-val" style={{color:'var(--red)'}}>-{fmtK(taxTotal)}</div></div>
           <div className="kpi"><div className="kpi-label">Capital investi</div><div className="kpi-val">{fmtK(totalInit)}</div></div>
         </div>
+        <div className="kpi-row" style={{marginTop:6}}>
+          <div className="kpi"><div className="kpi-label">Performance brute</div>
+            <div className="kpi-val" style={{color:perf>=0?'var(--green)':'var(--red)'}}>{perf>=0?'+':''}{perf.toFixed(1)}%</div></div>
+          <div className="kpi"><div className="kpi-label">Risque portefeuille</div>
+            <div className="kpi-val" style={{display:'flex',alignItems:'center',gap:6}}>
+              <span className="risk-dots">
+                {[1,2,3,4,5].map(i=>(
+                  <span key={i} className="risk-dot" style={{width:9,height:9,background:i<=riskKey?RISK[riskKey].color:'var(--border2)'}} />
+                ))}
+              </span>
+              <span style={{color:RISK[riskKey].color,fontSize:13,fontWeight:600}}>{RISK[riskKey].label}</span>
+            </div>
+          </div>
+        </div>
         <div className="legend">
-          {keys.map(k=><span key={k}><span className="ldot" style={{background:COLORS[k]}} />{PRODUCTS_META[k].name} — {fmtK(projs[k][horizon])}</span>)}
-          {savingsVals&&<span><span className="ldot" style={{background:'#9ca3af',opacity:.7}} />DCA seul — {fmtK(savingsVals[horizon])}</span>}
+          {keys.map(k=>{
+            const g=gainProjs[k][horizon];
+            return <span key={k}><span className="ldot" style={{background:COLORS[k]}} />{PRODUCTS_META[k].name} — <span style={{color:g>=0?'var(--green)':'var(--red)'}}>{g>=0?'+':''}{fmtK(g)}</span></span>;
+          })}
+          {savingsGain&&<span><span className="ldot" style={{background:'#9ca3af',opacity:.7}} />DCA seul — <span style={{color:savingsGain[horizon]>=0?'var(--green)':'var(--red)'}}>{savingsGain[horizon]>=0?'+':''}{fmtK(savingsGain[horizon])}</span></span>}
         </div>
         <div className="chart-wrap"><ChartCanvas config={projConfig} /></div>
+        <div className="chart-legend-desc">
+          <div className="cld-row">
+            <span className="cld-dot" style={{background:COLORS.etf}} />
+            <span><strong>ETF / produits financiers</strong> — Gain = valeur du portefeuille − capital versé (apport + DCA). L'argent reste investi et liquide à tout moment ; le gain part de 0 et monte dès la 1ʳᵉ année.</span>
+          </div>
+          <div className="cld-row">
+            <span className="cld-dot" style={{background:COLORS.immo}} />
+            <span><strong>Immo locatif</strong> — Gain = équité nette (valeur bien − capital restant dû) + cashflows cumulés (loyers encaissés − charges − mensualités − impôts) − apport. L'apport est immobilisé ; si le cashflow mensuel est négatif, la courbe part en dessous de 0 et le point où elle repasse à 0 est le <em>breakeven</em>.</span>
+          </div>
+          <div className="cld-row cld-note">
+            <span>⚠ La fiscalité de sortie (ETF, AV…) est déduite uniquement sur la dernière année de la période.</span>
+          </div>
+        </div>
       </div>
 
       <div className="rblock">
@@ -719,23 +980,63 @@ function Results({ selected, params, monthlySaving, savingsTarget='etf' }) {
         <div className="chart-wrap" style={{height:160}}><ChartCanvas config={cfConfig} /></div>
 
         <div className="cf-breakdown">
-          {cfItems.map(d=>(
-            <div className="cf-prod" key={d.id}>
-              <div className="cf-prod-name">
-                <i className={`ti ${PRODUCTS_META[d.id].icon}`} style={{color:COLORS[d.id]}} />
-                {d.name}
+          {cfItems.map(d=>{
+            const isOpen = expandedCF === d.id;
+            const hasDetail = d.detail && (
+              (d.detail.revenus && d.detail.revenus.length > 0) ||
+              (d.detail.charges && d.detail.charges.length > 0) ||
+              (d.detail.items   && d.detail.items.length   > 0)
+            );
+            return (
+              <div className={`cf-prod ${hasDetail?'cf-clickable':''}`} key={d.id}
+                   onClick={()=>hasDetail&&setExpandedCF(isOpen?null:d.id)}>
+                <div className="cf-prod-header">
+                  <div className="cf-prod-name">
+                    <i className={`ti ${PRODUCTS_META[d.id].icon}`} style={{color:COLORS[d.id]}} />
+                    {d.name}
+                  </div>
+                  <div className="cf-equation">
+                    <span className="cf-chip rev">+{fmt(d.revenus)} revenus</span>
+                    <span className="cf-op">−</span>
+                    <span className="cf-chip cst">{fmt(d.couts)} charges</span>
+                    <span className="cf-op">=</span>
+                    <span className={`cf-chip ${d.net>=0?'net-pos':'net-neg'}`} style={{fontSize:13}}>
+                      {fmtSign(d.net)}/mois
+                    </span>
+                    {hasDetail && <span className="cf-toggle">{isOpen?'▲':'▼'}</span>}
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="cf-detail">
+                    {d.detail.revenus && d.detail.revenus.length > 0 && (<>
+                      <div className="cf-detail-section">Revenus</div>
+                      {d.detail.revenus.map((r,i)=>(
+                        <div key={i} className="cf-detail-row">
+                          <span>{r.l}</span>
+                          <span style={{color:r.v>=0?'var(--green)':'var(--red)'}}>{fmtSign(r.v)} €/mois</span>
+                        </div>
+                      ))}
+                    </>)}
+                    {d.detail.charges && d.detail.charges.length > 0 && (<>
+                      <div className="cf-detail-section">Charges</div>
+                      {d.detail.charges.map((r,i)=>(
+                        <div key={i} className="cf-detail-row">
+                          <span>{r.l}</span>
+                          <span style={{color:r.v>0?'var(--green)':r.v<0?'var(--red)':'var(--t3)'}}>{r.v===0?'non cash':fmtSign(r.v)+' €/mois'}</span>
+                        </div>
+                      ))}
+                    </>)}
+                    {d.detail.items && d.detail.items.length > 0 && d.detail.items.map((r,i)=>(
+                      <div key={i} className="cf-detail-row">
+                        <span>{r.l}</span>
+                        <span style={{color:r.v>=0?'var(--green)':'var(--red)'}}>{fmtSign(r.v)} €/mois</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="cf-equation">
-                <span className="cf-chip rev">+{fmt(d.revenus)} revenus</span>
-                <span className="cf-op">−</span>
-                <span className="cf-chip cst">{fmt(d.couts)} charges</span>
-                <span className="cf-op">=</span>
-                <span className={`cf-chip ${d.net>=0?'net-pos':'net-neg'}`} style={{fontSize:13}}>
-                  {fmtSign(d.net)}/mois
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           <div className="cf-total-row">
             <span>Total net mensuel</span>
             <span style={{color:totalCFNet>=0?'var(--green)':'var(--red)'}}>{fmtSign(totalCFNet)}/mois</span>
@@ -775,7 +1076,7 @@ function App() {
   const delTab=id=>{
     const newTabs=tabs.filter(t=>t.id!==id);
     setTabs(newTabs);
-    if(tabs[realIdx]?.id===id) setActiveId(newTabs[0]?.id??null);
+    setActiveId(cur=>cur===id?(newTabs[0]?.id??null):cur);
   };
   const renameTab=(id,name)=>setTabs(ts=>ts.map(t=>t.id===id?{...t,name}:t));
 
@@ -802,6 +1103,14 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+// Expose calc functions for test suite
+window.__sim = {
+  computeETFBlend, computeETFRisk, getProductRisk,
+  calcImmoMonthly, projectProduct,
+  getCostBasis, netAfterTax,
+  PRODUCTS_META, ETF_PRESETS, SAVINGS_CAPABLE,
+};
 </script>
 </body>
 </html>
